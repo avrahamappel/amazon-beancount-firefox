@@ -64,19 +64,35 @@ class OrderReader
     constructor() {}
 
     // Fetch the invoice by taking the URL from the order node.
-    #orderNodeToFetch(order_node)
+    async #orderNodeToFetch(order_node)
     {
         const links = order_node.querySelectorAll("a.a-link-normal");
         var detail_uri = undefined;
         for(var i = 0; i < links.length; i++)
         {
-            if(links[i].textContent.trim() == "View invoice")
+            const link = links[i];
+            const text = link.textContent.trim();
+            if(text === "View invoice")
             {
-                detail_uri = links[i].href;
+                detail_uri = link.href;
                 break;
+            }
+            if(text === "Invoice" && link.querySelector("i.a-icon-popover"))
+            {
+                // Fetch dropdown HTML, then find "Printable Order Summary"
+                const dropdownHtml = await fetch(link.href).then(r => r.text());
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(dropdownHtml, "text/html");
+                const printableLink = Array.from(doc.querySelectorAll("a"))
+                    .find(a => a.textContent.trim() === "Printable Order Summary");
+                if (printableLink) {
+                    detail_uri = printableLink.href;
+                    break;
+                }
             }
         }
 
+        if (!detail_uri) return null;
         return fetch(detail_uri).then((response) => {
             if(response.status != 200) {
                 return null;
